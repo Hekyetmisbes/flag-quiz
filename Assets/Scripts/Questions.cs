@@ -5,6 +5,8 @@ using UnityEngine.UI;
 using Mono.Data.Sqlite;
 using System.Collections;
 using UnityEngine.Networking;
+using Unity.VisualScripting;
+using System.Net;
 
 public class Questions : MonoBehaviour
 {
@@ -38,7 +40,7 @@ public class Questions : MonoBehaviour
         StartCoroutine(LoadQuestion());
     }
 
-    private IEnumerator LoadQuestion()
+    public IEnumerator LoadQuestion()
     {
         using (var dbConnection = new SqliteConnection(connectionString))
         {
@@ -47,36 +49,44 @@ public class Questions : MonoBehaviour
             // Rastgele bir soru seçme
             using (IDbCommand dbCmd = dbConnection.CreateCommand())
             {
-                string sqlQuery = "SELECT * FROM flags ORDER BY RANDOM() LIMIT 1"; // Rastgele bir soru se�me
+                string sqlQuery = "SELECT * FROM flags ORDER BY RANDOM() LIMIT 1"; // Rastgele bir soru seçme
                 dbCmd.CommandText = sqlQuery;
 
                 using (IDataReader reader = dbCmd.ExecuteReader())
                 {
                     if (reader.Read())
                     {
-                        using (UnityWebRequest www = UnityWebRequestTexture.GetTexture(reader.GetString(3)))
+                        using (UnityWebRequest webRequest = UnityWebRequestTexture.GetTexture("https://flagcdn.com/h240/bi.png"))
                         {
-                            yield return www.SendWebRequest();
+                            // Web isteği yap
+                            yield return webRequest.SendWebRequest();
 
-                            if (www.result == UnityWebRequest.Result.Success)
+                            // Hata kontrolü
+                            if (webRequest.result == UnityWebRequest.Result.Success)
                             {
-                                Texture2D texture = ((DownloadHandlerTexture)www.downloadHandler).texture;
-                                Sprite sprite = Sprite.Create(texture, new Rect(0, 0, texture.width, texture.height), Vector2.zero);
+                                // Texture'ı al ve RawImage'a at
+                                Texture2D texture = DownloadHandlerTexture.GetContent(webRequest);
+
+                                Sprite sprite = Sprite.Create(texture, new Rect(0, 0, texture.width, texture.height), Vector2.one * 0.5f);
+
+                                // RawImage'a sprite'ı at
                                 soruResmi.sprite = sprite;
 
-                                Debug.Log("Soru yüklendi!");
                             }
                             else
                             {
-                                Debug.Log("Resim yükleme hatası: " + www.error);
+                                Debug.LogError("Error downloading image: " + webRequest.error);
                             }
                         }
+
                         Debug.Log("Soru Url: " + reader.GetString(3));
                         dogruCevap = reader.GetString(0);
                         secenekAText.text = "Amerika";
                         secenekBText.text = "Almanya";
                         secenekCText.text = "Fransa";
                         secenekDText.text = "İngiltere";
+
+
                     }
                 }
             }
