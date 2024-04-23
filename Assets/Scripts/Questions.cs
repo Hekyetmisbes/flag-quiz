@@ -43,11 +43,11 @@ public class Questions : MonoBehaviour
 
     int score = 0;
 
-#if UNITY_ANDROID && !UNITY_EDITOR
+    
+    //private string connectionString = "URI=file:" + Application.dataPath + "/Plugins/flags2.db";
+    
     private string connectionString = "URI=file:" + Application.persistentDataPath + "/flags2.db";
-#else
-    private string connectionString = "URI=file:" + Application.dataPath + "/Plugins/flags2.db";
-#endif
+
 
     private string correctAnswer;
 
@@ -185,6 +185,10 @@ public class Questions : MonoBehaviour
                         if (reader.GetString(0) != correctAnswer)
                         {
                             return reader.GetString(0);
+                        }
+                        else
+                        {
+                            GetRandomCountryName();
                         }
                     }
                 }
