@@ -5,6 +5,7 @@ using UnityEngine.UI;
 using Mono.Data.Sqlite;
 using System.Collections;
 using UnityEngine.Networking;
+using System.IO;
 
 public class Questions : MonoBehaviour
 {
@@ -43,16 +44,30 @@ public class Questions : MonoBehaviour
 
     int score = 0;
 
-    
-    //private string connectionString = "URI=file:" + Application.dataPath + "/Plugins/flags2.db";
-    
-    private string connectionString = "URI=file:" + Application.persistentDataPath + "/flags2.db";
+    //private string connectionString = "URI=file:" + Application.dataPath + "/StreamingAssets/" + "flags2.db";
+
+    //private string connectionString = "URI=file:" + Application.streamingAssetsPath + "/" + "flags2.db";
+
+    private string connectionString = "URI=file:" + "jar:file://" + Application.dataPath + "!/StreamingAssets/" + "flags2.db";
+
+    /*private string databaseName = "flags2.db";
+    private string connectionString;*/
 
 
     private string correctAnswer;
 
     void Start()
     {
+        /*
+        // Veritabanı dosyasını PersistentDataPath'e kopyala
+        string filePath = Path.Combine(Application.persistentDataPath, databaseName);
+        if (!File.Exists(filePath))
+        {
+            string sourcePath = Path.Combine(Application.streamingAssetsPath, databaseName);
+            File.Copy(sourcePath, filePath, true);
+        }
+
+        connectionString = "URI=file:" + filePath;*/
         StartCoroutine(LoadQuestion());
     }
 
@@ -62,13 +77,14 @@ public class Questions : MonoBehaviour
         chooseBButton.interactable = true;
         chooseCButton.interactable = true;
         chooseDButton.interactable = true;
+
         using (var dbConnection = new SqliteConnection(connectionString))
         {
             dbConnection.Open();
 
-            // Choose a random question
             using (IDbCommand dbCmd = dbConnection.CreateCommand())
             {
+                // Choose a random question
                 string sqlQuery = "SELECT * FROM flags ORDER BY RANDOM() LIMIT 1";
                 dbCmd.CommandText = sqlQuery;
 
@@ -76,60 +92,28 @@ public class Questions : MonoBehaviour
                 {
                     if (reader.Read())
                     {
-                        string imageUrl = "https://flagcdn.com/h240/" + reader.GetString(1) + ".png"; // Get the image URL
-                        correctAnswer = reader.GetString(0); // Select the correct answer from the database according to the country code
-                        Debug.Log(reader.GetString(1));
-                        Debug.Log(correctAnswer);
+                        string countryCode = reader.GetString(1);
+                        correctAnswer = reader.GetString(0);
 
-                        // Randomly select the correct answer and other options
-                        int randomsayi = Random.Range(0, 4);
+                        // Choose a random answer for the correct answer
+                        int randomIndex = Random.Range(0, 4);
+                        SetRandomAnswers(randomIndex, correctAnswer);
 
-                        switch (randomsayi)
+                        // Load the question image
+                        string imageUrl = "https://flagcdn.com/h240/" + countryCode + ".png";
+                        UnityWebRequest webRequest = UnityWebRequestTexture.GetTexture(imageUrl);
+                        yield return webRequest.SendWebRequest();
+
+                        // If the image is downloaded successfully, set the image to the questionImage.
+                        if (webRequest.result == UnityWebRequest.Result.Success)
                         {
-                            case 0:
-                                chooseAText.text = reader.GetString(0);
-                                chooseBText.text = GetRandomCountryName();
-                                chooseCText.text = GetRandomCountryName();
-                                chooseDText.text = GetRandomCountryName();
-                                break;
-                            case 1:
-                                chooseAText.text = GetRandomCountryName();
-                                chooseBText.text = reader.GetString(0);
-                                chooseCText.text = GetRandomCountryName();
-                                chooseDText.text = GetRandomCountryName();
-                                break;
-                            case 2:
-                                chooseAText.text = GetRandomCountryName();
-                                chooseBText.text = GetRandomCountryName();
-                                chooseCText.text = reader.GetString(0);
-                                chooseDText.text = GetRandomCountryName();
-                                break;
-                            case 3:
-                                chooseAText.text = GetRandomCountryName();
-                                chooseBText.text = GetRandomCountryName();
-                                chooseCText.text = GetRandomCountryName();
-                                chooseDText.text = reader.GetString(0);
-                                break;
+                            Texture2D texture = DownloadHandlerTexture.GetContent(webRequest);
+                            Sprite sprite = Sprite.Create(texture, new Rect(0, 0, texture.width, texture.height), new Vector2(0.5f, 0.5f));
+                            questionImage.sprite = sprite;
                         }
-
-                        // Load the image from the URL
-                        using (UnityWebRequest webRequest = UnityWebRequestTexture.GetTexture(imageUrl))
+                        else
                         {
-                            yield return webRequest.SendWebRequest();
-
-                            if (webRequest.result == UnityWebRequest.Result.Success)
-                            {
-                                Texture2D texture = DownloadHandlerTexture.GetContent(webRequest);
-
-                                Sprite sprite = Sprite.Create(texture, new Rect(0, 0, texture.width, texture.height), Vector2.one * 0.5f);
-
-                                questionImage.sprite = sprite;
-
-                            }
-                            else
-                            {
-                                Debug.LogError("Error downloading image: " + webRequest.error);
-                            }
+                            Debug.LogError("Resim indirme hatası: " + webRequest.error);
                         }
                     }
                 }
@@ -138,8 +122,40 @@ public class Questions : MonoBehaviour
         }
     }
 
+    // Set the random answers
+    private void SetRandomAnswers(int randomIndex, string correctAnswer)
+    {
+        switch (randomIndex)
+        {
+            case 0:
+                chooseAText.text = correctAnswer;
+                chooseBText.text = GetRandomCountryName();
+                chooseCText.text = GetRandomCountryName();
+                chooseDText.text = GetRandomCountryName();
+                break;
+            case 1:
+                chooseAText.text = GetRandomCountryName();
+                chooseBText.text = correctAnswer;
+                chooseCText.text = GetRandomCountryName();
+                chooseDText.text = GetRandomCountryName();
+                break;
+            case 2:
+                chooseAText.text = GetRandomCountryName();
+                chooseBText.text = GetRandomCountryName();
+                chooseCText.text = correctAnswer;
+                chooseDText.text = GetRandomCountryName();
+                break;
+            case 3:
+                chooseAText.text = GetRandomCountryName();
+                chooseBText.text = GetRandomCountryName();
+                chooseCText.text = GetRandomCountryName();
+                chooseDText.text = correctAnswer;
+                break;
+        }
+    }
+
     // Check the answer
-    public void CheckAnswer()
+    protected void CheckAnswer()
     {
         // If the selected answer is correct
         if (UnityEngine.EventSystems.EventSystem.current.currentSelectedGameObject.GetComponentInChildren<TextMeshProUGUI>().text == correctAnswer)
